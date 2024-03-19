@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
 
@@ -47,15 +48,27 @@ def interpolation(left_data, right_data, t, method='linear', return_first_key=Tr
 
         return res
     elif method == 'slerp':
-        key_rots = R.from_quat([left_data[joint_idx] for joint_idx in range(len(left_data))])
-        key_times = [0, 1]
-        slerp = Slerp(key_times, key_rots)
-        new_key_frames = np.linspace(0, 1, t + 1)
-        interp_rots = slerp(new_key_frames)
-        for i in range(len(interp_rots) - 1):
-            data_between = [interp_rots[joint_idx] for joint_idx in range(len(interp_rots[i]))]
-            res.append(data_between)
-                
+        num_joints = left_data.shape[0]
+
+        # Preallocate space for interpolated rotations
+        interp_rots = np.empty((t, num_joints, 4))  # Assuming 't' includes the end frame
+
+        for joint_idx in range(num_joints):  # Loop over each joint
+            q1 = left_data[joint_idx]
+            q2 = right_data[joint_idx]
+
+            # Setup Slerp for this joint's rotation
+            key_rots = R.from_quat([q1, q2])
+            key_times = [0, 1]
+            slerp = Slerp(key_times, key_rots)
+
+            # Generate timestamps for interpolation, exclude the end timestamp to avoid duplication
+            new_key_frames = np.linspace(0, 1, num=t, endpoint=False)  
+            interp_rots[:, joint_idx, :] = slerp(new_key_frames).as_quat()
+
+        # Ensure the final rotation matches the end rotation, if necessary
+        res.extend(interp_rots.tolist())
+    
         return res
     ########## Code End ############
 
@@ -137,17 +150,31 @@ def concatenate_two_motions(motion1, motion2, last_frame_index, start_frame_indx
     '''
     
     ########## Code Start ############
-    # search_win1 = 
-    # search_win2 = 
+    search_win1 = motion1.local_joint_rotations[last_frame_index - searching_frames:last_frame_index + searching_frames]
+    search_win2 = motion2.local_joint_rotations[max(0, start_frame_indx - searching_frames):start_frame_indx + searching_frames]
+
     
-    # sim_matrix = 
-    # min_idx = 
-    # i, j = min_idx // sim_matrix.shape[1], min_idx % sim_matrix.shape[1]
-    # real_i, real_j = 
+    sim_matrix = np.linalg.norm(search_win1[:, np.newaxis, :, :] - search_win2[np.newaxis, :, :, :], axis=(-2, -1))
+
+    # Visualize the similarity matrix
+    plt.imshow(sim_matrix)
+    plt.show()
+    plt.savefig('sim_matrix.png') 
+
+    min_idx = np.argmin(sim_matrix)
+    i, j = min_idx // sim_matrix.shape[1], min_idx % sim_matrix.shape[1]
+    real_i, real_j = int(last_frame_index - searching_frames + i), int(max(0, start_frame_indx - searching_frames) + j)
+
+    # Calculate the Root Position Offset
+    root_offset = motion1.local_joint_positions[real_i, 0, :] - motion2.local_joint_positions[real_j, 0, :]
     
-    # between_local_pos = 
-    # between_local_rot = 
+    # Apply Spatial Offset to the Entire Second Motion for Root Position
+    adjusted_motion2_positions = motion2.local_joint_positions.copy()
+    adjusted_motion2_positions[:, 0, :] += root_offset
     
+    # Perform interpolation including the root joint.
+    between_local_pos = interpolation(motion1.local_joint_positions[real_i], adjusted_motion2_positions[real_j], between_frames, 'linear', False)
+    between_local_rot = interpolation(motion1.local_joint_rotations[real_i], motion2.local_joint_rotations[real_j], between_frames, 'slerp', False)
     ########## Code End ############
     
     res = motion1.raw_copy()
@@ -190,12 +217,12 @@ def part2_concatenate(viewer, between_frames, example=False):
 def main():
     viewer = SimpleViewer()  
    
-    # part1_key_framing(viewer, 10, 10)
-    # part1_key_framing(viewer, 10, 5)
-    # part1_key_framing(viewer, 10, 20)
-    # part1_key_framing(viewer, 10, 30)
-    part2_concatenate(viewer, between_frames=8, example=True)
-    # part2_concatenate(viewer, between_frames=8)  
+    #part1_key_framing(viewer, 10, 10)
+    #part1_key_framing(viewer, 10, 5)
+    #part1_key_framing(viewer, 10, 20)
+    #part1_key_framing(viewer, 10, 30)
+    #part2_concatenate(viewer, between_frames=8, example=True)
+    part2_concatenate(viewer, between_frames=8)  
     viewer.run()
 
 
