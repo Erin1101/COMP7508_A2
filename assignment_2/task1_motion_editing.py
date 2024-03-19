@@ -41,12 +41,21 @@ def interpolation(left_data, right_data, t, method='linear', return_first_key=Tr
     '''
     ########## Code Start ############
     if method == 'linear':
-        
-        
+        for i in range(1, t + 1):
+            data_between = left_data + (right_data - left_data) * (i / t)
+            res.append(data_between)
+
         return res
     elif method == 'slerp':
-        
-        
+        key_rots = R.from_quat([left_data[joint_idx] for joint_idx in range(len(left_data))])
+        key_times = [0, 1]
+        slerp = Slerp(key_times, key_rots)
+        new_key_frames = np.linspace(0, 1, t + 1)
+        interp_rots = slerp(new_key_frames)
+        for i in range(len(interp_rots) - 1):
+            data_between = [interp_rots[joint_idx] for joint_idx in range(len(interp_rots[i]))]
+            res.append(data_between)
+                
         return res
     ########## Code End ############
 
