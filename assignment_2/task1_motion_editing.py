@@ -161,16 +161,17 @@ def concatenate_two_motions(motion1, motion2, last_frame_index, start_frame_indx
     plt.show()
     plt.savefig('sim_matrix.png') 
 
-    min_idx = np.argmin(sim_matrix)
+    min_idx = np.min(sim_matrix)
     i, j = min_idx // sim_matrix.shape[1], min_idx % sim_matrix.shape[1]
     real_i, real_j = int(last_frame_index - searching_frames + i), int(max(0, start_frame_indx - searching_frames) + j)
 
     # Calculate the Root Position Offset
-    root_offset = motion1.local_joint_positions[real_i, 0, :] - motion2.local_joint_positions[real_j, 0, :]
+    root_pos_offset = motion1.local_joint_positions[real_i, 0, :] - motion2.local_joint_positions[real_j, 0, :]
     
     # Apply Spatial Offset to the Entire Second Motion for Root Position
     adjusted_motion2_positions = motion2.local_joint_positions.copy()
-    adjusted_motion2_positions[:, 0, :] += root_offset
+    adjusted_motion2_positions[:, 0, :] += root_pos_offset
+
     
     # Perform interpolation including the root joint.
     between_local_pos = interpolation(motion1.local_joint_positions[real_i], adjusted_motion2_positions[real_j], between_frames, 'linear', False)
@@ -221,8 +222,8 @@ def main():
     #part1_key_framing(viewer, 10, 5)
     #part1_key_framing(viewer, 10, 20)
     #part1_key_framing(viewer, 10, 30)
-    #part2_concatenate(viewer, between_frames=8, example=True)
-    part2_concatenate(viewer, between_frames=8)  
+    part2_concatenate(viewer, between_frames=8, example=True)
+    #part2_concatenate(viewer, between_frames=8)  
     viewer.run()
 
 
